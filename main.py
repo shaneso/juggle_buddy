@@ -45,11 +45,14 @@ def load_reference_data():
 def main():
     parser = argparse.ArgumentParser(description='Juggle Buddy - Live juggling tracking')
     parser.add_argument('--test', action='store_true', help='Run in test mode (no webcam required)')
+    parser.add_argument('--video', type=str, help='Use video file instead of webcam (e.g., --video path/to/video.mp4)')
     args = parser.parse_args()
     
     print("=" * 60)
     if args.test:
         print("Juggle Buddy - Test Mode")
+    elif args.video:
+        print("Juggle Buddy - Video Mode")
     else:
         print("Juggle Buddy - Live Tracking")
     print("=" * 60)
@@ -102,12 +105,21 @@ def main():
         print("\n✅ All tests passed! Ready for live tracking when webcam is available.")
         return
     
-    # Open webcam
-    print("\nOpening webcam...")
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("ERROR: Could not open webcam")
-        return
+    # Open webcam or video file
+    if args.video:
+        print(f"\nOpening video file: {args.video}")
+        cap = cv2.VideoCapture(args.video)
+        if not cap.isOpened():
+            print(f"ERROR: Could not open video file: {args.video}")
+            return
+        print(f"Video file opened successfully")
+    else:
+        print("\nOpening webcam...")
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("ERROR: Could not open webcam")
+            print("Try using --test for test mode or --video <file> to use a video file")
+            return
     
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
