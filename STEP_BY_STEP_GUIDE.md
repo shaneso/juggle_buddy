@@ -261,11 +261,19 @@ python scripts/test_ball_detection.py
 
 ### Step 3.2: Improve Ball Detection (YOLO Integration)
 
-**Option A: Quick Improvement - Color-based Detection**
+✅ **DONE**: Color-based detection has been implemented by replacing `detect_balls()` in `ball_tracker.py`.
 
-If YOLO setup is complex, start with color-based detection:
+The function now uses HSV color range masking instead of HoughCircles. The default detects bright/white objects, but you can adjust the color range.
 
-**File**: `juggle_buddy/ball_tracker.py` - Add this function:
+**Current Implementation**: `detect_balls()` now uses color-based detection with optional `color_range` parameter.
+
+**To adjust for your ball colors**: Modify the HSV values in `juggle_buddy/ball_tracker.py` lines 28-29, or pass a custom `color_range` when calling the function.
+
+---
+
+**Option A: Color-based Detection** (✅ Already Implemented)
+
+The `detect_balls()` function now uses color-based detection. For reference, here's what was implemented:
 
 ```python
 def detect_balls_by_color(img: np.ndarray, color_range: tuple = None) -> List[Dict]:
