@@ -7,9 +7,9 @@ A system that tracks ball paths during juggling and compares them against an ide
 
 ✅ **Core Modules Implemented**:
 - `path_utils.py` - Ball path data structures
-- `ball_tracker.py` - Ball detection and tracking (HoughCircles)
+- `ball_tracker.py` - Ball detection and tracking (YOLO v8 + color-based fallback)
 - `reference_extractor.py` - Extract ideal paths from reference video
-- `body_scaler.py` - Body scaling for different performer sizes
+- `body_scaler.py` - Body scaling using YOLO v8 pose estimation
 - `path_comparator.py` - Path comparison and scoring (1-100)
 - `video_recorder.py` - Video I/O utilities
 
@@ -27,58 +27,14 @@ A system that tracks ball paths during juggling and compares them against an ide
 
 ## Architecture
 
-### Recommended Module Structure
-
-1. **`video_recorder.py`** - Handles video capture from webcam
-   - Record reference video
-   - Record live performance
-   - Frame extraction utilities
-
-2. **`ball_tracker.py`** - Ball detection and tracking
-   - Uses YOLO for ball detection
-   - Tracks 3 balls individually across frames
-   - Returns ball positions (x, y, frame_number) for each ball
-
-3. **`reference_extractor.py`** - Creates ideal path from reference video
-   - Processes reference video to extract ball paths
-   - Normalizes paths (centers around juggler)
-   - Stores reference paths as numpy arrays
-
-4. **`body_scaler.py`** - Scales reference to match live performer
-   - Detects body keypoints (shoulders, hips) using OpenCV or MediaPipe
-   - Calculates scaling factor based on body dimensions
-   - Applies scaling to reference paths
-
-5. **`path_comparator.py`** - Compares live paths to reference
-   - Aligns live paths with reference paths (temporal alignment)
-   - Calculates horizontal and vertical deviations
-   - Computes score (1-100) based on deviation metrics
-
-6. **`main.py`** - Main application controller
-   - Orchestrates all modules
-   - Handles user interface/feedback
-   - Manages video recording workflow
+All core modules are implemented. See `DESIGN_SUGGESTIONS.md` for detailed architecture information.
 
 ### Key Design Decisions
 
-1. **Ball Tracking**: Use YOLO v8 (ultralytics) for detection, then use OpenCV's tracking algorithms (CSRT, KCF) for frame-to-frame tracking
-2. **Body Scaling**: Use OpenCV's DNN pose estimation as primary (more stable across Python versions), MediaPipe as optional enhancement
-3. **Path Representation**: Store paths as numpy arrays of (x, y, frame) tuples, one array per ball
-4. **Scoring Metric**: 
-   - Horizontal deviation: distance from ideal x position
-   - Vertical deviation: distance from ideal y position
-   - Temporal alignment: match cycles using cross-correlation
-   - Score = 100 - (normalized_deviation * 100), clamped to 1-100
-
-### Progressive Development Strategy
-
-Start with unit tests for each module, building from simplest to most complex:
-1. Path data structures and utilities
-2. Ball tracking (with mock frames)
-3. Reference extraction
-4. Body scaling
-5. Path comparison
-6. Integration tests
+1. **Ball Tracking**: Multi-color detection (red, blue, green) by default - more reliable than YOLO for specific ball colors. YOLO available as option.
+2. **Body Scaling**: Uses YOLO v8 pose estimation (nano model) for body keypoint detection
+3. **Path Representation**: NumPy arrays of (x, y) coordinates, one array per ball
+4. **Scoring Metric**: Deviation-based scoring (1-100) comparing live paths to normalized reference paths
 
 ## Setup
 
@@ -155,6 +111,22 @@ python scripts/test_path_comparison.py
 # Start live tracking with scoring
 python main.py
 ```
+
+## Ball Color Calibration
+
+If ball detection is poor, calibrate your ball colors:
+
+```bash
+# Run calibration tool to find HSV ranges for your balls
+python scripts/calibrate_ball_colors.py
+```
+
+This interactive tool helps you:
+- Find HSV color ranges for red, blue, and green balls
+- See real-time preview of detected colors
+- Save calibrated values to use in ball detection
+
+**Note**: By default, ball detection uses multi-color detection (red, blue, green) which is more reliable than YOLO for specific colored balls.
 
 ## Project Structure
 
