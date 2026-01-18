@@ -8,37 +8,41 @@ from typing import List, Dict, Optional
 from .path_utils import BallPath
 
 
-def detect_balls(img: np.ndarray) -> List[Dict]:
+def detect_balls(img: np.ndarray, color_range: tuple = None) -> List[Dict]:
     """
-    Detect balls in an image.
+    Detect balls by color (useful if balls are distinct colors).
     
     Args:
-        img: Input image (BGR format)
+        img: Input image (BGR)
+        color_range: HSV color range tuple ((lower_h, lower_s, lower_v), (upper_h, upper_s, upper_v))
         
     Returns:
-        List of detected balls, each as a dict with 'x', 'y', 'radius' or similar
+        List of detected balls
     """
-    # Convert to grayscale
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     
-    # Use HoughCircles for initial detection (simple approach)
-    # In production, this would use YOLO
-    circles = cv2.HoughCircles(
-        gray,
-        cv2.HOUGH_GRADIENT,
-        dp=1,
-        minDist=30,
-        param1=50,
-        param2=30,
-        minRadius=10,
-        maxRadius=50
-    )
+    # Default: detect bright/white objects (adjust for your balls)
+    if color_range is None:
+        lower = np.array([0, 0, 200])  # Adjust these values
+        upper = np.array([180, 30, 255])
+    else:
+        lower, upper = color_range
+    
+    mask = cv2.inRange(hsv, lower, upper)
+    
+    # Find contours
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     balls = []
-    if circles is not None:
-        circles = np.round(circles[0, :]).astype("int")
-        for (x, y, r) in circles:
-            balls.append({'x': int(x), 'y': int(y), 'radius': int(r)})
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if 50 < area < 5000:  # Filter by size
+            (x, y), radius = cv2.minEnclosingCircle(contour)
+            balls.append({
+                'x': int(x),
+                'y': int(y),
+                'radius': int(radius)
+            })
     
     return balls
 
