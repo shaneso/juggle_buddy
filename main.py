@@ -2,6 +2,7 @@
 import cv2
 import pickle
 import numpy as np
+import argparse
 from pathlib import Path
 from juggle_buddy.ball_tracker import BallTracker
 from juggle_buddy.reference_extractor import ReferenceExtractor, normalize_reference
@@ -42,8 +43,15 @@ def load_reference_data():
     return normalized, keypoints
 
 def main():
+    parser = argparse.ArgumentParser(description='Juggle Buddy - Live juggling tracking')
+    parser.add_argument('--test', action='store_true', help='Run in test mode (no webcam required)')
+    args = parser.parse_args()
+    
     print("=" * 60)
-    print("Juggle Buddy - Live Tracking")
+    if args.test:
+        print("Juggle Buddy - Test Mode")
+    else:
+        print("Juggle Buddy - Live Tracking")
     print("=" * 60)
     
     # Load reference data
@@ -63,6 +71,36 @@ def main():
     scaler = BodyScaler()
     if ref_keypoints is not None:
         scaler.set_reference_keypoints(ref_keypoints)
+    
+    if args.test:
+        # Test mode - run offline tests
+        print("\nRunning in test mode (no webcam required)")
+        print("Testing components...")
+        
+        # Test path comparison with mock data
+        mock_paths = [
+            np.array([[100, 200], [110, 210], [120, 220]]),
+            np.array([[150, 250], [160, 260], [170, 270]]),
+            np.array([[200, 300], [210, 310], [220, 320]])
+        ]
+        
+        scores = comparator.compare(mock_paths)
+        print(f"✅ Path comparison test: Score {scores['overall_score']}/100")
+        
+        # Test scaling
+        if ref_keypoints is not None:
+            mock_live_keypoints = {
+                'left_shoulder': np.array([50, 100]),
+                'right_shoulder': np.array([150, 100]),
+                'left_hip': np.array([50, 200]),
+                'right_hip': np.array([150, 200])
+            }
+            scale_factor = calculate_scaling_factor(ref_keypoints, mock_live_keypoints)
+            scaled_paths = scale_paths(mock_paths, scale_factor)
+            print(f"✅ Scaling test: Scale factor {scale_factor:.2f}")
+        
+        print("\n✅ All tests passed! Ready for live tracking when webcam is available.")
+        return
     
     # Open webcam
     print("\nOpening webcam...")

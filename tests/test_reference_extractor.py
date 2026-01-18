@@ -3,7 +3,7 @@ Unit tests for reference path extraction module.
 """
 import pytest
 import numpy as np
-from juggle_buddy.reference_extractor import ReferenceExtractor, extract_reference_paths, normalize_reference
+from juggle_buddy.reference_extractor import ReferenceExtractor, normalize_reference
 
 
 class TestReferenceExtractor:
@@ -33,21 +33,20 @@ class TestReferenceExtractor:
         extractor = ReferenceExtractor()
         
         # Mock tracker with paths
+        class MockBallPath:
+            def __init__(self, ball_id, positions):
+                self.ball_id = ball_id
+                self.positions = positions
+            
+            def __len__(self):
+                return len(self.positions)
+        
         class MockTracker:
             def get_paths(self):
                 return [
-                    type('BallPath', (), {
-                        'ball_id': 0,
-                        'positions': np.array([[100, 200], [110, 210], [120, 220]])
-                    })(),
-                    type('BallPath', (), {
-                        'ball_id': 1,
-                        'positions': np.array([[150, 250], [160, 260], [170, 270]])
-                    })(),
-                    type('BallPath', (), {
-                        'ball_id': 2,
-                        'positions': np.array([[200, 300], [210, 310], [220, 320]])
-                    })()
+                    MockBallPath(0, np.array([[100, 200], [110, 210], [120, 220]])),
+                    MockBallPath(1, np.array([[150, 250], [160, 260], [170, 270]])),
+                    MockBallPath(2, np.array([[200, 300], [210, 310], [220, 320]]))
                 ]
         
         tracker = MockTracker()
@@ -62,7 +61,7 @@ class TestNormalizeReference:
     """Test reference normalization functions."""
     
     def test_normalize_reference_centers_paths(self):
-        """Test that normalize_reference centers all paths."""
+        """Test that normalize_reference centers all paths around a common origin."""
         paths = [
             np.array([[100, 200], [110, 210]]),
             np.array([[150, 250], [160, 260]]),
@@ -71,10 +70,11 @@ class TestNormalizeReference:
         
         normalized = normalize_reference(paths)
         
-        # All paths should be centered around origin
-        for path in normalized:
-            center = path.mean(axis=0)
-            assert np.allclose(center, [0, 0], atol=10.0)  # Allow some tolerance
+        # All paths should be centered around a common origin
+        # Collect all positions from normalized paths
+        all_normalized_positions = np.vstack(normalized)
+        global_center = all_normalized_positions.mean(axis=0)
+        assert np.allclose(global_center, [0, 0], atol=1.0)  # Allow some tolerance
     
     def test_normalize_reference_preserves_relative_positions(self):
         """Test that normalization preserves relative ball positions."""

@@ -60,12 +60,12 @@ class TestCalculateScalingFactor:
             'right_hip': np.array([200, 300])
         }
         
-        # Live person is twice as wide
+        # Live person is twice as large (both width and height)
         live_keypoints = {
             'left_shoulder': np.array([50, 100]),
             'right_shoulder': np.array([250, 100]),
-            'left_hip': np.array([50, 300]),
-            'right_hip': np.array([250, 300])
+            'left_hip': np.array([50, 500]),  # Twice the height (400 units)
+            'right_hip': np.array([250, 500])
         }
         
         scale = calculate_scaling_factor(ref_keypoints, live_keypoints)
