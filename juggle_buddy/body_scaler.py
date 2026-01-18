@@ -6,28 +6,142 @@ import numpy as np
 import cv2
 from typing import Dict, List, Optional
 
+# Global YOLO pose model (initialized once)
+_yolo_pose_model = None
 
-def detect_body_keypoints(img: np.ndarray) -> Dict[str, np.ndarray]:
+
+def _get_yolo_pose_model(model_path: Optional[str] = None):
+    """Get or create YOLO pose model (cached globally for performance)."""
+    global _yolo_pose_model
+    
+    if _yolo_pose_model is None:
+        try:
+            from ultralytics import YOLO
+            
+            if model_path is None:
+                # Use YOLOv8 nano pose model (lightweight and fast)
+                # First run will download the model automatically (~6MB)
+                model_path = 'yolov8n-pose.pt'
+            
+            _yolo_pose_model = YOLO(model_path)
+            print(f"✅ YOLO pose model loaded: {model_path}")
+        except ImportError:
+            raise ImportError(
+                "ultralytics not installed. Install with: pip install ultralytics"
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to load YOLO pose model: {e}")
+    
+    return _yolo_pose_model
+
+
+def detect_body_keypoints(img: np.ndarray, use_yolo: bool = True, confidence: float = 0.25, model_path: Optional[str] = None) -> Dict[str, np.ndarray]:
     """
-    Detect body keypoints (shoulders, hips) in an image.
+    Detect body keypoints (shoulders, hips) using YOLOv8 pose estimation.
+    
+    Args:
+        img: Input image (BGR format)
+        use_yolo: If True (default), use YOLO pose. If False, use fallback.
+        confidence: Confidence threshold for YOLO detections (0.0-1.0)
+        model_path: Optional path to custom YOLO pose model file
+        
+    Returns:
+        Dictionary with keypoint names and positions
+    """
+    if use_yolo:
+        try:
+            return _detect_keypoints_yolo(img, confidence, model_path)
+        except Exception as e:
+            print(f"⚠️  YOLO pose detection failed ({e}), using fallback")
+            return _detect_keypoints_fallback(img)
+    else:
+        return _detect_keypoints_fallback(img)
+
+
+def _detect_keypoints_yolo(img: np.ndarray, confidence: float = 0.25, model_path: Optional[str] = None) -> Dict[str, np.ndarray]:
+    """
+    Detect body keypoints using YOLOv8 pose estimation.
+    
+    YOLO pose keypoint indices (COCO format):
+    - 5: left_shoulder
+    - 6: right_shoulder
+    - 11: left_hip
+    - 12: right_hip
+    
+    Args:
+        img: Input image (BGR format)
+        confidence: Confidence threshold (0.0-1.0)
+        model_path: Optional path to custom YOLO pose model
+        
+    Returns:
+        Dictionary with keypoint names and positions
+    """
+    model = _get_yolo_pose_model(model_path)
+    
+    # Run YOLO pose detection
+    results = model(img, conf=confidence, verbose=False)
+    
+    keypoints = {}
+    height, width = img.shape[:2]
+    
+    # YOLO pose keypoint indices (COCO format)
+    KEYPOINT_INDICES = {
+        'left_shoulder': 5,
+        'right_shoulder': 6,
+        'left_hip': 11,
+        'right_hip': 12
+    }
+    
+    if results and len(results) > 0:
+        result = results[0]
+        
+        # Check if keypoints are detected
+        if result.keypoints is not None and result.keypoints.data is not None:
+            # Get the first (most confident) person detected
+            keypoints_data = result.keypoints.data
+            
+            if len(keypoints_data) > 0:
+                # Get keypoints for first person (shape: [17, 3] = [x, y, confidence])
+                person_keypoints = keypoints_data[0].cpu().numpy()
+                
+                # Extract needed keypoints
+                for name, idx in KEYPOINT_INDICES.items():
+                    if idx < len(person_keypoints):
+                        kp = person_keypoints[idx]
+                        x, y, conf = kp[0], kp[1], kp[2]
+                        
+                        # Only use keypoint if confidence is reasonable
+                        if conf > 0.3:  # Confidence threshold for individual keypoints
+                            keypoints[name] = np.array([float(x), float(y)])
+    
+    # If we didn't get all keypoints, fill in missing ones with fallback
+    required_keys = ['left_shoulder', 'right_shoulder', 'left_hip', 'right_hip']
+    if not all(key in keypoints for key in required_keys):
+        # Use fallback for missing keypoints
+        fallback = _detect_keypoints_fallback(img)
+        for key in required_keys:
+            if key not in keypoints:
+                keypoints[key] = fallback[key]
+    
+    return keypoints
+
+
+def _detect_keypoints_fallback(img: np.ndarray) -> Dict[str, np.ndarray]:
+    """
+    Fallback: Estimate keypoints based on image dimensions.
+    This is a simple placeholder when YOLO pose detection is not available or fails.
     
     Args:
         img: Input image (BGR format)
         
     Returns:
-        Dictionary with keypoint names and positions
+        Dictionary with estimated keypoint positions
     """
-    # Use OpenCV DNN for pose estimation (more stable than MediaPipe)
-    # For now, return a simple structure
-    # In production, would use OpenPose or similar
-    
     keypoints = {}
-    
-    # Placeholder implementation
-    # In production, this would use a pose estimation model
     height, width = img.shape[:2]
     
-    # Estimate keypoints (simplified - would use actual pose detection)
+    # Estimate keypoints (center-based estimation)
+    # These are rough estimates - not accurate!
     keypoints['left_shoulder'] = np.array([width * 0.4, height * 0.3])
     keypoints['right_shoulder'] = np.array([width * 0.6, height * 0.3])
     keypoints['left_hip'] = np.array([width * 0.4, height * 0.6])
